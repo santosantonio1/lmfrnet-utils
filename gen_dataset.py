@@ -1,0 +1,59 @@
+import argparse
+import os
+import pickle
+import numpy as np
+import torchvision.transforms as transforms
+
+DATA_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    './autodl-tmp/data-cifar10/cifar-10-batches-py/test_batch',
+)
+OUTPUT_DIR = './dataset-quant'
+QUANTIZATION_SCALE = 8192
+
+transform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize(
+        mean=[0.4914, 0.4822, 0.4465],
+        std=[0.2023, 0.1994, 0.2010],
+    ),
+])
+
+
+def unpickle(file):
+    with open(file, 'rb') as f:
+        return pickle.load(f, encoding='bytes')
+
+
+def quantize(image):
+    img = image.reshape(3, 32, 32).transpose(1, 2, 0)
+    img = transform(img).unsqueeze(0)
+    return (img.permute(0, 2, 3, 1).numpy().flatten() * QUANTIZATION_SCALE).astype(np.int32)
+
+
+def generate_header(name, values, root=OUTPUT_DIR):
+    os.makedirs(root, exist_ok=True)
+
+    filename = f'{root}/{name}.h'
+    header_guard = name.upper()
+    with open(filename, 'w') as f:
+        f.write(f'#ifndef __{header_guard}_H__\n')
+        f.write(f'#define __{header_guard}_H__\n\n')
+        f.write(f'const int {name}[{values.size}] = {{\n')
+        f.write(',\n'.join(map(str, values)))
+        f.write('\n};\n')
+        f.write('\n#endif')
+
+    print(f'[+] image generated in {filename} file!')
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Generate quantized CIFAR-10 test images as .h files')
+    parser.add_argument('--num-images', type=int, default=10, help='number of images to generate')
+    parser.add_argument('--output-dir', default=OUTPUT_DIR, help='directory to write .h files to')
+    args = parser.parse_args()
+
+    test_batch = unpickle(DATA_PATH)
+
+    for n, image in enumerate(test_batch[b'data'][:args.num_images], start=1):
+        generate_header(f'image{n}', quantize(image), root=args.output_dir)

@@ -52,7 +52,9 @@ python gen_dataset.py [--num-images 10] [--output-dir ./dataset-quant]
 Writes `image1.h` .. `imageN.h`, each holding a normalized, fixed-point
 `int32` (×8192) CIFAR-10 test image, in the same quantization scheme as the
 weights above — for feeding into the embedded inference code alongside the
-exported weights.
+exported weights. Each image is also permuted from PyTorch's NCHW layout to
+TensorFlow's NHWC layout before flattening, and the header comments the true
+class and the fused model's predicted class (index + name) for that image.
 
 ## Quantization scheme
 

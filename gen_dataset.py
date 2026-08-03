@@ -40,7 +40,7 @@ def quantize(img):
     return (img.unsqueeze(0).permute(0, 2, 3, 1).numpy().flatten() * QUANTIZATION_SCALE).astype(np.int32)
 
 
-def generate_header(name, values, label, prediction, root=OUTPUT_DIR):
+def generate_header(name, values, label, prediction, score, root=OUTPUT_DIR):
     os.makedirs(root, exist_ok=True)
 
     filename = f'{root}/{name}.h'
@@ -49,7 +49,7 @@ def generate_header(name, values, label, prediction, root=OUTPUT_DIR):
         f.write(f'#ifndef __{header_guard}_H__\n')
         f.write(f'#define __{header_guard}_H__\n\n')
         f.write(f'// class: {label} ({CLASSES[label]})\n')
-        f.write(f'// predicted class: {prediction} (val = {prediction}, {CLASSES[prediction]})\n')
+        f.write(f'// predicted class: {prediction} (val = {score}, {CLASSES[prediction]})\n')
         f.write(f'const int {name}[{values.size}] = {{\n')
         f.write(',\n'.join(map(str, values)))
         f.write('\n};\n')
@@ -70,7 +70,9 @@ if __name__ == '__main__':
 
     model = load_fused_model()
     with torch.no_grad():
-        predictions = model(imgs).argmax(dim=1).tolist()
+        scores, predictions = model(imgs).max(dim=1)
+        scores = (scores * QUANTIZATION_SCALE).round().long().tolist()
+        predictions = predictions.tolist()
 
-    for n, (img, label, prediction) in enumerate(zip(imgs, labels, predictions), start=1):
-        generate_header(f'image{n}', quantize(img), label, prediction, root=args.output_dir)
+    for n, (img, label, prediction, score) in enumerate(zip(imgs, labels, predictions, scores), start=1):
+        generate_header(f'image{n}', quantize(img), label, prediction, score, root=args.output_dir)

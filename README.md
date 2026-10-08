@@ -36,12 +36,13 @@ python download_dataset.py
 **2. Export quantized model weights as C headers:**
 
 ```sh
-python fused_weights.py [--output-dir ./fused-weights]
+python fused_weights.py [--output-dir ./fused-weights] [--layout hwio|oihw]
 ```
 
 Fuses Conv+BatchNorm+ReLU in `checkpoint/ckpt.pth` (caching to
 `checkpoint/fused_model.pth` on first run) and writes one `.h` file per
 parameter tensor, quantized to fixed-point `int32` (×8192).
+`--layout` picks the weight order: `hwio` (default) or `oihw`, PyTorch's native order.
 
 **3. Export quantized test images as C headers:**
 

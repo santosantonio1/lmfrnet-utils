@@ -12,9 +12,20 @@ def quantize(params):
     return params.detach().numpy() * QUANTIZATION_SCALE
 
 
-def generate_header(name, params, root=OUTPUT_DIR):
+def to_hwio(params):
+    if params.ndim == 4:
+        return params.transpose(2, 3, 1, 0)
+    if params.ndim == 2:
+        return params.T
+    return params
+
+
+def generate_header(name, params, root=OUTPUT_DIR, layout='hwio'):
     os.makedirs(root, exist_ok=True)
 
+    if layout == 'hwio':
+        params = to_hwio(params)
+        
     name = name.replace('features.', '', 1).replace('.', '_')
     header_guard = name.upper()
     values = params.flatten().astype(np.int32)
@@ -36,9 +47,11 @@ def generate_header(name, params, root=OUTPUT_DIR):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate quantized fused-model weights as .h files')
     parser.add_argument('--output-dir', default=OUTPUT_DIR, help='directory to write .h files to')
+    parser.add_argument('--layout', choices=['hwio', 'oihw'], default='hwio',
+                        help='weight order: hwio (TensorFlow) or oihw (PyTorch)')
     args = parser.parse_args()
 
     fused_model = load_fused_model()
 
     for name, params in fused_model.state_dict().items():
-        generate_header(name, quantize(params), root=args.output_dir)
+        generate_header(name, quantize(params), root=args.output_dir, layout=args.layout)
